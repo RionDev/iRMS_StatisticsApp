@@ -1,9 +1,13 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { AppCenterMessage } from '@common/components/AppCenterMessage';
 import { LoginPage } from '@common/pages/LoginPage';
 import { SignupPage } from '@common/pages/SignupPage';
-import { AppCenterMessage } from '@common/components/AppCenterMessage';
-import { AppLayout } from '@common/components/AppLayout';
 import { useAuthStore } from '@common/stores/authStore';
+
+const SampleStatsPage = lazy(() =>
+  import('./pages/SampleStatsPage').then((module) => ({ default: module.SampleStatsPage })),
+);
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -14,20 +18,21 @@ function RequireAuth({ children }: { children: React.ReactElement }) {
   return children;
 }
 
-function PlaceholderPage() {
-  return (
-    <AppLayout appName="통계" sidebarItems={[]} version={__APP_VERSION__}>
-      <AppCenterMessage>아직 서비스 하지 않습니다.</AppCenterMessage>
-    </AppLayout>
-  );
-}
-
 export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage signupUrl="/statistics/signup" defaultRedirect="/statistics/" />} />
       <Route path="/signup" element={<SignupPage loginUrl="/statistics/login" />} />
-      <Route path="/" element={<RequireAuth><PlaceholderPage /></RequireAuth>} />
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <Suspense fallback={<AppCenterMessage>통계 화면을 불러오는 중...</AppCenterMessage>}>
+              <SampleStatsPage />
+            </Suspense>
+          </RequireAuth>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
