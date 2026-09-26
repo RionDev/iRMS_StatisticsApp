@@ -25,17 +25,20 @@ interface RankCardProps {
   labelWidth?: number;
   height?: number;
   style?: CSSProperties;
+  /** 급상승/목록 본문 대신 보여줄 내용(선행 조건 로딩·실패·빈 상태 등). 있으면 fetchTrend/fetchList 를 부르지 않는다 */
+  override?: ReactNode;
 }
 
 /** TOP-N 수평 막대 7종 공통. 급상승 보기에서는 급상승/신규 등장 표 */
-export function RankCard({ title, view, fetchList, fetchTrend, deps = [], controls, color, labelWidth = 120, height = 320, style }: RankCardProps) {
+export function RankCard({ title, view, fetchList, fetchTrend, deps = [], controls, color, labelWidth = 120, height = 320, style, override }: RankCardProps) {
   return (
     <ChartCard title={title} controls={controls} style={style}>
-      {view === 'rising' ? (
-        <TrendPanel fetchTrend={fetchTrend} deps={deps} height={height} />
-      ) : (
-        <ListBody view={toApiView(view)} fetchList={fetchList} deps={deps} color={color} labelWidth={labelWidth} height={height} />
-      )}
+      {override ??
+        (view === 'rising' ? (
+          <TrendPanel fetchTrend={fetchTrend} deps={deps} height={height} />
+        ) : (
+          <ListBody view={toApiView(view)} fetchList={fetchList} deps={deps} color={color} labelWidth={labelWidth} height={height} />
+        ))}
     </ChartCard>
   );
 }

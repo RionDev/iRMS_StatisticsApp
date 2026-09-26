@@ -6,6 +6,7 @@ import { useStat } from '../hooks/useStat';
 import { getDiag, getTrend, getVendorDetection } from '../services/statsService';
 import type { View } from '../types/stats';
 import { RankCard } from './RankCard';
+import { StatBody } from './StatBody';
 
 const LIMIT = 20;
 
@@ -35,22 +36,26 @@ export function DiagCard({ view, style }: { view: View; style?: CSSProperties })
     </SearchSelect>
   );
 
+  const override =
+    rising && (vendors.loading || vendors.failed || list.length === 0) ? (
+      <StatBody state={vendors} height={400} isEmpty={(d) => d.items.length === 0}>
+        {() => null}
+      </StatBody>
+    ) : undefined;
+
   return (
     <RankCard
       title="vendor 별 진단명"
       view={view}
       fetchList={(v) => getDiag(v, effective ?? undefined, LIMIT)}
-      fetchTrend={() =>
-        effective == null
-          ? Promise.resolve({ kind: 'diag' as const, computed_date: null, window: null, rising: [], new: [] })
-          : getTrend('diag', { vendor: effective, limit: LIMIT })
-      }
+      fetchTrend={() => getTrend('diag', { vendor: effective as number, limit: LIMIT })}
       deps={[effective]}
       controls={controls}
       color={theme.colors.danger}
       labelWidth={220}
       height={400}
       style={style}
+      override={override}
     />
   );
 }
