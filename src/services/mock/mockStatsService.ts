@@ -1,160 +1,282 @@
-// statsService 의 UI 단독 개발용 mock 구현.
-// 시드 고정 PRNG 로 세션 간 동일한 분포를 생성한다 (일별 추이만 오늘 기준 역산).
-
+/** UI 단독 개발용 mock (VITE_USE_MOCK=1) — stats_service 응답 모양을 흉내 낸다 */
 import type {
-  DailyStats,
-  DetectionRatioStats,
-  LocalesStats,
-  StatsBucket,
-  StatsSummary,
-  TopDetectionsStats,
-  TypesStats,
-  VendorOption,
+  ApiView,
+  DateRange,
+  DiagStats,
+  Distribution,
+  Envelope,
+  HeatmapStats,
+  InflowStats,
+  InflowTodayStats,
+  Item,
+  LocaleItem,
+  MetaStats,
+  PeStats,
+  RatioStats,
+  SummaryStats,
+  TagGroup,
+  TrendItem,
+  TrendKind,
+  TrendParams,
+  TrendStats,
+  VendorDetectionStats,
 } from '../../types/stats';
 
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
+function mulberry32(seed: number) {
+  let s = seed;
   return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delay<T>(value: T): Promise<T> {
+  return new Promise((resolve) => setTimeout(() => resolve(value), 60 + Math.floor(Math.random() * 120)));
 }
 
-const VENDORS: VendorOption[] = [
-  { id: 1, name: 'AhnLab' },
-  { id: 2, name: 'Kaspersky' },
-  { id: 3, name: 'BitDefender' },
-  { id: 4, name: 'Microsoft' },
-  { id: 5, name: 'ClamAV' },
-];
+const DAY_MS = 86_400_000;
+const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+const daysAgo = (n: number) => new Date(Date.now() - n * DAY_MS);
+const nowIso = () => new Date().toISOString().slice(0, 19);
+const SPAN: Record<ApiView, number> = { today: 1, day: 1, week: 7, month: 30, total: 400 };
 
-// 일별 등록 추이 — 최근 365일, 주말 감소 + 완만한 추세 (시드 고정)
-const DAY_MS = 24 * 60 * 60 * 1000;
-const dailyRand = mulberry32(20260819);
-const DAILY_ALL: { date: string; count: number }[] = (() => {
-  const out: { date: string; count: number }[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (let i = 364; i >= 0; i -= 1) {
-    const d = new Date(today.getTime() - i * DAY_MS);
-    const weekday = d.getDay();
-    const weekendFactor = weekday === 0 || weekday === 6 ? 0.45 : 1;
-    const trend = 1 + (364 - i) / 700; // 완만한 증가 추세
-    const noise = 0.6 + dailyRand() * 0.8;
-    const count = Math.round(120 * weekendFactor * trend * noise);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-      d.getDate(),
-    ).padStart(2, '0')}`;
-    out.push({ date: iso, count });
+function rangeOf(view: ApiView): DateRange | null {
+  switch (view) {
+    case 'today':
+      return { from: isoDate(daysAgo(0)), to: isoDate(daysAgo(0)) };
+    case 'day':
+      return { from: isoDate(daysAgo(1)), to: isoDate(daysAgo(1)) };
+    case 'week':
+      return { from: isoDate(daysAgo(7)), to: isoDate(daysAgo(1)) };
+    case 'month':
+      return { from: isoDate(daysAgo(30)), to: isoDate(daysAgo(1)) };
+    default:
+      return null;
   }
-  return out;
-})();
+}
 
-const TOTAL = 84_213 + DAILY_ALL.reduce((sum, b) => sum + b.count, 0);
+function envelope(view: ApiView): Envelope {
+  return { view, range: rangeOf(view), computed_at: nowIso() };
+}
 
-function distribute(names: string[], total: number, seed: number, skew = 2.2): StatsBucket[] {
-  const rand = mulberry32(seed);
-  const weights = names.map((_, i) => Math.pow(names.length - i, skew) * (0.7 + rand() * 0.6));
-  const weightSum = weights.reduce((a, b) => a + b, 0);
-  return names.map((name, i) => ({
-    name,
-    count: Math.max(1, Math.round((weights[i] / weightSum) * total)),
+const NAMES = {
+  source: ['VirusTotal', 'MalwareBazaar', '고객 신고', '내부 수집', '허니팟', '파트너 공유'],
+  locale: ['KR', 'US', 'CN', 'RU', 'JP', 'DE', 'BR', 'IN', 'VN', 'FR', 'GB', 'TR'],
+  format: ['PE32', 'PE64', 'ELF', 'APK', 'PDF', 'DOCX', 'Script', 'PE32_AutoIt', 'ZIP', 'MSI'],
+  category: ['Packer', 'Protector', 'Installer', 'SFX', 'Native', 'DotNet'],
+  spectype: ['UPX', 'Themida', 'VMProtect', 'MPRESS', 'ASPack', 'Enigma', 'PECompact', 'NSPack', 'Obsidium', 'ConfuserEx', 'Petite'],
+  overlay: ['NSIS', 'Inno Setup', '7z', 'ZIP', 'RAR', 'InstallShield', 'WiX', 'CAB', 'AutoIt', 'PyInstaller'],
+  compiler: ['MSVC', 'MinGW', 'Delphi', 'Go', 'Rust', 'VB6', 'Nim', 'Borland C++', 'Clang', 'FASM', 'Zig'],
+  library: ['.Net', 'Python', 'Electron', 'Qt', 'MFC', 'Java', 'Node', 'Lua', 'Tcl', 'wxWidgets', 'GTK'],
+  label: ['trojan', 'ransomware', 'miner', 'stealer', 'backdoor', 'downloader', 'worm', 'adware', 'rootkit', 'spyware', 'dropper', 'hacktool', 'banker', 'exploit', 'virus', 'botnet'],
+  general: ['agenttesla', 'formbook', 'lockbit', 'redline', 'upx', 'nsis', 'emotet', 'qakbot', 'njrat', 'remcos', 'lumma', 'vidar', 'asyncrat', 'raccoon', 'amadey', 'smokeloader', 'stealc', 'xworm', 'darkgate', 'pikabot', 'icedid'],
+  cve: ['cve-2017-11882', 'cve-2021-40444', 'cve-2023-38831', 'cve-2022-30190', 'cve-2018-0802', 'cve-2021-44228', 'cve-2023-23397', 'cve-2024-21412', 'cve-2019-0708', 'cve-2020-0796', 'cve-2017-0199', 'cve-2024-3400', 'cve-2023-4966', 'cve-2022-41082', 'cve-2021-26855', 'cve-2023-36884', 'cve-2024-21762', 'cve-2023-27997', 'cve-2022-26134', 'cve-2021-34527', 'cve-2023-20198'],
+  diag: ['Trojan.Win32.AgentTesla', 'Ransom.Win32.LockBit', 'Backdoor.MSIL.Remcos', 'Spyware.Win32.Redline', 'Trojan.Win32.Formbook', 'Dropper.Script.Emotet', 'Worm.Win32.Qakbot', 'Trojan.Android.Joker', 'Adware.Win32.Generic', 'HackTool.Win64.Mimikatz', 'Downloader.MSIL.Amadey', 'Stealer.Win32.Lumma', 'Trojan.Linux.Mirai', 'Virus.Win32.Sality', 'Backdoor.Win32.Cobalt', 'Trojan.Script.Agent', 'Miner.Win64.XMRig', 'Stealer.Win32.Vidar', 'Ransom.MSIL.Chaos', 'Worm.Script.Njrat', 'Trojan.Win32.Generic', 'Exploit.Doc.CVE-2017-11882'],
+} as const;
+
+const VENDORS = ['AhnLab', 'Kaspersky', 'BitDefender', 'Microsoft', 'ClamAV'];
+const LOCALE_FULL: Record<string, string> = {
+  KR: 'Korea, Republic of', US: 'United States', CN: 'China', RU: 'Russian Federation', JP: 'Japan', DE: 'Germany',
+  BR: 'Brazil', IN: 'India', VN: 'Viet Nam', FR: 'France', GB: 'United Kingdom', TR: 'Türkiye',
+};
+
+function rank(names: readonly string[], view: ApiView, seed: number): Item[] {
+  const rng = mulberry32(seed * 31 + SPAN[view]);
+  const scale = SPAN[view] * 30;
+  return names
+    .map((name, i) => ({ id: i + 1, name, count: Math.max(1, Math.round((scale * (0.3 + rng())) / (i * 0.6 + 1))) }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function distribution(names: readonly string[], view: ApiView, seed: number, limit: number): Distribution {
+  const all = rank(names, view, seed);
+  return {
+    ...envelope(view),
+    items: all.slice(0, limit),
+    others: all.slice(limit).reduce((sum, it) => sum + it.count, 0),
+  };
+}
+
+function inflowItems(view: ApiView) {
+  const rng = mulberry32(20260927 + SPAN[view]);
+  const point = (date: string, base: number) => {
+    const count = Math.round(base * (0.6 + rng() * 0.8));
+    const black = Math.round(count * 0.7);
+    return { date, count, black, gray: count - black };
+  };
+  if (view === 'total') {
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (11 - i));
+      return point(d.toISOString().slice(0, 7), 2400);
+    });
+  }
+  const days = view === 'month' ? 30 : view === 'week' ? 7 : 1;
+  const offset = view === 'today' ? 0 : 1;
+  return Array.from({ length: days }, (_, i) => point(isoDate(daysAgo(days - i - 1 + offset)), 80));
+}
+
+export function getSummary(view: ApiView): Promise<SummaryStats> {
+  const registered = inflowItems(view).reduce((s, it) => s + it.count, 0);
+  return delay({
+    ...envelope(view),
+    total_samples: registered,
+    registered,
+    black_ratio: 0.71,
+    undetected: Math.round(registered * 0.08),
+    all_detected: Math.round(registered * 0.21),
+    none_detected: Math.round(registered * 0.05),
+  });
+}
+
+export function getInflow(view: ApiView): Promise<InflowStats> {
+  return delay({ ...envelope(view), items: inflowItems(view) });
+}
+
+export function getInflowToday(): Promise<InflowTodayStats> {
+  const rng = mulberry32(7);
+  const hourNow = new Date().getHours();
+  const items = Array.from({ length: 24 }, (_, hour) => ({ hour, count: hour > hourNow ? 0 : Math.round(rng() * 12) }));
+  return delay({ ...envelope('today'), items });
+}
+
+export function getInflowHeatmap(view: 'week' | 'month'): Promise<HeatmapStats> {
+  const rng = mulberry32(view === 'week' ? 11 : 13);
+  const scale = view === 'week' ? 6 : 24;
+  const cells = Array.from({ length: 7 }, (_, d) =>
+    Array.from({ length: 24 }, (_, h) => Math.round(rng() * scale * (d < 5 ? 1 : 0.4) * (h >= 9 && h <= 18 ? 1.5 : 0.6))),
+  );
+  return delay({ ...envelope(view), cells });
+}
+
+export function getSource(view: ApiView, limit = 20) {
+  return delay(distribution(NAMES.source, view, 1, limit));
+}
+
+export function getLocale(view: ApiView, limit = 10): Promise<Distribution<LocaleItem>> {
+  const d = distribution(NAMES.locale, view, 2, limit);
+  return delay({ ...d, items: d.items.map((it) => ({ ...it, full_name: LOCALE_FULL[it.name] ?? null })) });
+}
+
+export function getFormat(view: ApiView, limit = 8) {
+  return delay(distribution(NAMES.format, view, 3, limit));
+}
+
+export function getFormatCategory(formatId: number, view: ApiView) {
+  return delay(distribution(NAMES.category, view, 40 + formatId, 100));
+}
+
+export function getFormatSpectype(formatId: number, view: ApiView, limit = 10) {
+  return delay(distribution(NAMES.spectype, view, 50 + formatId, limit));
+}
+
+export function getPe(view: ApiView, limit = 10): Promise<PeStats> {
+  return delay({
+    ...envelope(view),
+    category: rank(NAMES.category, view, 5).slice(0, limit),
+    spectype: rank(NAMES.spectype, view, 6).slice(0, limit),
+    overlay: rank(NAMES.overlay, view, 7).slice(0, limit),
+  });
+}
+
+export function getCompiler(view: ApiView, limit = 10) {
+  return delay(distribution(NAMES.compiler, view, 8, limit));
+}
+
+export function getLibrary(view: ApiView, limit = 10) {
+  return delay(distribution(NAMES.library, view, 9, limit));
+}
+
+export function getSize(view: ApiView): Promise<Distribution> {
+  const labels = ['<100K', '<1M', '<10M', '<50M', '≥50M'];
+  const rng = mulberry32(10 + SPAN[view]);
+  const items = labels.map((name, id) => ({ id, name, count: Math.round(SPAN[view] * 20 * (0.2 + rng()) * (id === 1 ? 2 : 1)) }));
+  return delay({ ...envelope(view), items, others: 0 });
+}
+
+export function getDiag(view: ApiView, vendor?: number, limit = 20): Promise<DiagStats> {
+  const d = distribution(NAMES.diag, view, 100 + (vendor ?? 0), limit);
+  return delay({ ...d, vendor: vendor == null ? null : { id: vendor, name: VENDORS[vendor - 1] ?? String(vendor) } });
+}
+
+export function getVendorDetection(view: ApiView): Promise<VendorDetectionStats> {
+  const rng = mulberry32(12 + SPAN[view]);
+  const total = SPAN[view] * 80;
+  const items = VENDORS.map((name, i) => {
+    const detected = Math.round(total * (0.5 + rng() * 0.45));
+    return { id: i + 1, name, detected, missed: total - detected, sole: Math.round(rng() * total * 0.03) };
+  });
+  return delay({ ...envelope(view), items });
+}
+
+export function getRatio(view: ApiView): Promise<RatioStats> {
+  const rng = mulberry32(14 + SPAN[view]);
+  const buckets = Array.from({ length: 10 }, (_, id) => ({
+    id,
+    range: `${id * 10}-${id * 10 + 10}`,
+    count: Math.round(SPAN[view] * 10 * (id === 0 || id === 9 ? 3 : 1) * (0.5 + rng())),
   }));
+  const sum = buckets.reduce((s, b) => s + b.count, 0);
+  return delay({
+    ...envelope(view),
+    buckets,
+    undetected: Math.round(sum * 0.08),
+    all_detected: Math.round(sum * 0.21),
+    none_detected: Math.round(sum * 0.05),
+  });
 }
 
-export async function getStatsSummary(): Promise<StatsSummary> {
-  await delay(150);
-  const last24h = DAILY_ALL[DAILY_ALL.length - 1].count;
-  const last7d = DAILY_ALL.slice(-7).reduce((sum, b) => sum + b.count, 0);
-  return {
-    total_samples: TOTAL,
-    last_24h: last24h,
-    last_7d: last7d,
-    avg_detect_ratio: 47,
-    pools: [
-      { name: 'Black', count: Math.round(TOTAL * 0.71) },
-      { name: 'Gray', count: Math.round(TOTAL * 0.29) },
-    ],
-  };
+export function getLabel(view: ApiView, limit = 15) {
+  return delay(distribution(NAMES.label, view, 15, limit));
 }
 
-export async function getDailyStats(days: number): Promise<DailyStats> {
-  await delay(200);
-  return { days, items: DAILY_ALL.slice(-days) };
+export function getTag(view: ApiView, group: TagGroup = 'general', limit = 20) {
+  return delay(distribution(group === 'cve' ? NAMES.cve : NAMES.general, view, group === 'cve' ? 17 : 16, limit));
 }
 
-export async function getTypesStats(): Promise<TypesStats> {
-  await delay(200);
-  return {
-    formats: distribute(
-      ['PE32', 'PE64', 'Text', 'Binary', 'ELF64', 'MSDOS', 'ELF32', 'Unknown'],
-      TOTAL,
-      11,
-    ),
-    categories: distribute(
-      ['Unknown', 'Archive', 'Document', 'Installer', 'Script', 'Packer', 'Image', 'SFX'],
-      TOTAL,
-      22,
-    ),
-  };
+const TREND_NAMES: Record<TrendKind, readonly string[]> = {
+  source: NAMES.source, locale: NAMES.locale, format: NAMES.format, category: NAMES.category,
+  spectype: NAMES.spectype, overlay: NAMES.overlay, compiler: NAMES.compiler, library: NAMES.library,
+  diag: NAMES.diag, label: NAMES.label, tag: NAMES.general,
+};
+
+export function getTrend(kind: TrendKind, params: TrendParams = {}): Promise<TrendStats> {
+  const names = kind === 'tag' && params.group === 'cve' ? NAMES.cve : TREND_NAMES[kind];
+  const limit = params.limit ?? 20;
+  const rng = mulberry32(kind.length * 97 + (params.format ?? 0) + (params.vendor ?? 0) * 7);
+  const half = Math.ceil(names.length / 2);
+  const ranked = (items: TrendItem[]) => items.slice(0, limit).map((it, i) => ({ ...it, rank: i + 1 }));
+  const rising = ranked(
+    names
+      .slice(0, half)
+      .map((name, i) => {
+        const prev = 10 + Math.round(rng() * 40);
+        const cur = prev + 5 + Math.round(rng() * 80);
+        return { id: i + 1, name, rank: 0, cur_count: cur, prev_count: prev, growth_pct: Math.round(((cur - prev) / prev) * 10000) / 100 };
+      })
+      .sort((a, b) => (b.growth_pct ?? 0) - (a.growth_pct ?? 0)),
+  );
+  const fresh = ranked(
+    names
+      .slice(half)
+      .map((name, i) => ({ id: half + i + 1, name, rank: 0, cur_count: 10 + Math.round(rng() * 30), prev_count: 0, growth_pct: null }))
+      .sort((a, b) => b.cur_count - a.cur_count),
+  );
+  return delay({
+    kind,
+    computed_date: isoDate(daysAgo(0)),
+    window: {
+      cur: { from: isoDate(daysAgo(7)), to: isoDate(daysAgo(1)) },
+      prev: { from: isoDate(daysAgo(14)), to: isoDate(daysAgo(8)) },
+    },
+    rising,
+    new: fresh,
+  });
 }
 
-export async function getLocalesStats(): Promise<LocalesStats> {
-  await delay(200);
-  return {
-    items: distribute(['US', 'CN', 'KR', 'RU', '??', 'JP', 'DE', 'BR', 'IN', 'VN'], TOTAL, 33, 1.8),
-  };
-}
-
-export async function getDetectionRatioStats(): Promise<DetectionRatioStats> {
-  await delay(200);
-  const rand = mulberry32(44);
-  const ranges = ['0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90', '90-100'];
-  // 양극단이 두터운 U자 분포 (미진단 다수 + 고진단 다수)
-  const weights = [3.2, 1.1, 0.8, 0.7, 0.8, 0.9, 1.1, 1.4, 1.9, 2.4];
-  const weightSum = weights.reduce((a, b) => a + b, 0);
-  return {
-    buckets: ranges.map((range, i) => ({
-      range,
-      count: Math.round((weights[i] / weightSum) * TOTAL * (0.9 + rand() * 0.2)),
-    })),
-  };
-}
-
-const DIAG_BASE = [
-  'Trojan.Win32.Agent', 'Trojan.Win32.Generic', 'Ransom.Win32.LockBit',
-  'Worm.Win32.Zbot', 'Backdoor.MSIL.Njrat', 'Trojan.Script.Emotet',
-  'Downloader.Win32.Qakbot', 'Spyware.MSIL.AgentTesla', 'Trojan.Win64.Redline',
-  'Adware.Win32.Generic', 'Virus.Win32.Formbook', 'HackTool.Win32.Remcos',
-  'Dropper.Win32.Conti', 'Trojan.Android.Agent', 'Worm.Linux.Generic',
-  'Ransom.Win32.Wannacry', 'Backdoor.Win32.Gandcrab', 'Trojan.MSIL.Generic',
-  'Downloader.Script.Agent', 'Spyware.Win32.Keylogger',
-];
-
-export async function getTopDetections(vendorId: number, limit = 20): Promise<TopDetectionsStats> {
-  await delay(250);
-  const vendor = VENDORS.find((v) => v.id === vendorId);
-  if (!vendor) return { vendor_id: vendorId, items: [] };
-  const rand = mulberry32(1000 + vendorId);
-  const suffix = String.fromCharCode(97 + (vendorId % 26));
-  const items = DIAG_BASE.map((base, index) => ({
-    diag_id: index + 1,
-    name: `${base}.${suffix}${String.fromCharCode(97 + Math.floor(rand() * 26))}`,
-    count: Math.round(300 + rand() * 8000),
-  }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit);
-  return { vendor_id: vendorId, items };
-}
-
-export async function getVendors(): Promise<VendorOption[]> {
-  await delay(100);
-  return VENDORS;
+export function getMeta(): Promise<MetaStats> {
+  return delay({ hourly_last_ok: nowIso(), daily_last_ok: nowIso(), last_failed: null, lookups_loaded_at: nowIso() });
 }

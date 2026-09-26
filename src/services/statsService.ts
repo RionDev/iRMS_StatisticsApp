@@ -1,64 +1,131 @@
-// 샘플 통계 API 레이어 — sample-service `/api/sample/stats/*` 조회.
-// 계약 SoT: /api/sample/docs Swagger. UI 단독 개발 시 VITE_USE_MOCK=1 사용.
-
 import apiClient from '@common/services/apiClient';
 import type {
-  DailyStats,
-  DetectionRatioStats,
-  LocalesStats,
-  StatsSummary,
-  TopDetectionsStats,
-  TypesStats,
-  VendorOption,
+  ApiView,
+  DiagStats,
+  Distribution,
+  HeatmapStats,
+  InflowStats,
+  InflowTodayStats,
+  LocaleItem,
+  MetaStats,
+  PeStats,
+  RatioStats,
+  SummaryStats,
+  TagGroup,
+  TrendKind,
+  TrendParams,
+  TrendStats,
+  VendorDetectionStats,
 } from '../types/stats';
 import * as mock from './mock/mockStatsService';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === '1';
+const BASE = '/api/stats/sample';
 
-export async function getStatsSummary(): Promise<StatsSummary> {
-  if (USE_MOCK) return mock.getStatsSummary();
-  const res = await apiClient.get<StatsSummary>('/api/sample/stats/summary');
+async function get<T>(path: string, params?: Record<string, unknown>): Promise<T> {
+  const res = await apiClient.get<T>(`${BASE}${path}`, { params });
   return res.data;
 }
 
-export async function getDailyStats(days: number): Promise<DailyStats> {
-  if (USE_MOCK) return mock.getDailyStats(days);
-  const res = await apiClient.get<DailyStats>('/api/sample/stats/daily', { params: { days } });
-  return res.data;
+export function getSummary(view: ApiView): Promise<SummaryStats> {
+  if (USE_MOCK) return mock.getSummary(view);
+  return get('/summary', { view });
 }
 
-export async function getTypesStats(): Promise<TypesStats> {
-  if (USE_MOCK) return mock.getTypesStats();
-  const res = await apiClient.get<TypesStats>('/api/sample/stats/types');
-  return res.data;
+export function getInflow(view: ApiView): Promise<InflowStats> {
+  if (USE_MOCK) return mock.getInflow(view);
+  return get('/inflow', { view });
 }
 
-export async function getLocalesStats(): Promise<LocalesStats> {
-  if (USE_MOCK) return mock.getLocalesStats();
-  const res = await apiClient.get<LocalesStats>('/api/sample/stats/locales');
-  return res.data;
+export function getInflowToday(): Promise<InflowTodayStats> {
+  if (USE_MOCK) return mock.getInflowToday();
+  return get('/inflow/today');
 }
 
-export async function getDetectionRatioStats(): Promise<DetectionRatioStats> {
-  if (USE_MOCK) return mock.getDetectionRatioStats();
-  const res = await apiClient.get<DetectionRatioStats>('/api/sample/stats/detection-ratio');
-  return res.data;
+export function getInflowHeatmap(view: 'week' | 'month'): Promise<HeatmapStats> {
+  if (USE_MOCK) return mock.getInflowHeatmap(view);
+  return get('/inflow/heatmap', { view });
 }
 
-export async function getTopDetections(
-  vendorId: number,
-  limit = 20,
-): Promise<TopDetectionsStats> {
-  if (USE_MOCK) return mock.getTopDetections(vendorId, limit);
-  const res = await apiClient.get<TopDetectionsStats>('/api/sample/stats/top-detections', {
-    params: { vendor_id: vendorId, limit },
-  });
-  return res.data;
+export function getSource(view: ApiView, limit = 20): Promise<Distribution> {
+  if (USE_MOCK) return mock.getSource(view, limit);
+  return get('/source', { view, limit });
 }
 
-/** 벤더 셀렉트 옵션 — sample-service 필터 사전에서 vendors 만 사용 */
-export async function getVendors(): Promise<VendorOption[]> {
-  if (USE_MOCK) return mock.getVendors();
-  const res = await apiClient.get<{ vendors: VendorOption[] }>('/api/sample/meta/filters');
-  return res.data.vendors;
+export function getLocale(view: ApiView, limit = 10): Promise<Distribution<LocaleItem>> {
+  if (USE_MOCK) return mock.getLocale(view, limit);
+  return get('/locale', { view, limit });
+}
+
+export function getFormat(view: ApiView, limit = 8): Promise<Distribution> {
+  if (USE_MOCK) return mock.getFormat(view, limit);
+  return get('/format', { view, limit });
+}
+
+export function getFormatCategory(formatId: number, view: ApiView): Promise<Distribution> {
+  if (USE_MOCK) return mock.getFormatCategory(formatId, view);
+  return get(`/format/${formatId}/category`, { view });
+}
+
+export function getFormatSpectype(formatId: number, view: ApiView, limit = 10): Promise<Distribution> {
+  if (USE_MOCK) return mock.getFormatSpectype(formatId, view, limit);
+  return get(`/format/${formatId}/spectype`, { view, limit });
+}
+
+export function getPe(view: ApiView, limit = 10): Promise<PeStats> {
+  if (USE_MOCK) return mock.getPe(view, limit);
+  return get('/pe', { view, limit });
+}
+
+export function getCompiler(view: ApiView, limit = 10): Promise<Distribution> {
+  if (USE_MOCK) return mock.getCompiler(view, limit);
+  return get('/compiler', { view, limit });
+}
+
+export function getLibrary(view: ApiView, limit = 10): Promise<Distribution> {
+  if (USE_MOCK) return mock.getLibrary(view, limit);
+  return get('/library', { view, limit });
+}
+
+export function getSize(view: ApiView): Promise<Distribution> {
+  if (USE_MOCK) return mock.getSize(view);
+  return get('/size', { view });
+}
+
+/** vendor 생략 시 5벤더 합산 */
+export function getDiag(view: ApiView, vendor?: number, limit = 20): Promise<DiagStats> {
+  if (USE_MOCK) return mock.getDiag(view, vendor, limit);
+  return get('/diag', vendor == null ? { view, limit } : { view, limit, vendor });
+}
+
+export function getVendorDetection(view: ApiView): Promise<VendorDetectionStats> {
+  if (USE_MOCK) return mock.getVendorDetection(view);
+  return get('/vendor-detection', { view });
+}
+
+export function getRatio(view: ApiView): Promise<RatioStats> {
+  if (USE_MOCK) return mock.getRatio(view);
+  return get('/ratio', { view });
+}
+
+export function getLabel(view: ApiView, limit = 15): Promise<Distribution> {
+  if (USE_MOCK) return mock.getLabel(view, limit);
+  return get('/label', { view, limit });
+}
+
+export function getTag(view: ApiView, group: TagGroup = 'general', limit = 20): Promise<Distribution> {
+  if (USE_MOCK) return mock.getTag(view, group, limit);
+  return get('/tag', { view, group, limit });
+}
+
+/** 급상승·신규 등장. category·spectype·overlay 는 format, diag 는 vendor 필수 */
+export function getTrend(kind: TrendKind, params: TrendParams = {}): Promise<TrendStats> {
+  if (USE_MOCK) return mock.getTrend(kind, params);
+  const query = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined));
+  return get(`/trend/${kind}`, query);
+}
+
+export function getMeta(): Promise<MetaStats> {
+  if (USE_MOCK) return mock.getMeta();
+  return get('/meta');
 }

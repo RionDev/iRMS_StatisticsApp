@@ -1,13 +1,9 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppCenterMessage } from '@common/components/AppCenterMessage';
 import { LoginPage } from '@common/pages/LoginPage';
 import { SignupPage } from '@common/pages/SignupPage';
 import { useAuthStore } from '@common/stores/authStore';
-
-const SampleStatsPage = lazy(() =>
-  import('./pages/SampleStatsPage').then((module) => ({ default: module.SampleStatsPage })),
-);
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -28,7 +24,7 @@ export function App() {
         element={
           <RequireAuth>
             <Suspense fallback={<AppCenterMessage>통계 화면을 불러오는 중...</AppCenterMessage>}>
-              <SampleStatsPage />
+              <AppCenterMessage>통계 화면 전환 중입니다.</AppCenterMessage>
             </Suspense>
           </RequireAuth>
         }
