@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../services/statsService', () => ({
   getSummary: vi.fn(),
@@ -25,6 +25,7 @@ const summary = (view: string, registered: number) => ({
 
 describe('PageHeader', () => {
   beforeEach(() => {
+    vi.setSystemTime(new Date('2026-09-27T12:00:00'));
     vi.mocked(svc.getSummary).mockImplementation(async (v) => summary(v, v === 'total' ? 9999 : 120) as never);
     vi.mocked(svc.getMeta).mockResolvedValue({
       hourly_last_ok: '2026-09-27T10:05:00',
@@ -39,6 +40,10 @@ describe('PageHeader', () => {
       rising: [],
       new: [],
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('주간: 기간 문구, 전체 샘플은 total 값, 집계 시각과 실패 문구', async () => {
@@ -63,5 +68,28 @@ describe('PageHeader', () => {
     render(<PageHeader view="week" onViewChange={() => undefined} />);
     expect(await screen.findByText('120')).toBeInTheDocument();
     expect(screen.queryByText(/집계/)).toBeNull();
+  });
+
+  it('hourly 실패가 hourly_last_ok 보다 오래됐으면 실패 문구를 숨긴다', async () => {
+    vi.mocked(svc.getMeta).mockResolvedValue({
+      hourly_last_ok: '2026-09-27T10:05:00',
+      daily_last_ok: '2026-09-27T05:00:00',
+      last_failed: { job: 'hourly', finished_at: '2026-09-27T09:00:00', message: 'x' },
+      lookups_loaded_at: null,
+    });
+    render(<PageHeader view="week" onViewChange={() => undefined} />);
+    expect(await screen.findByText('10:05 집계')).toBeInTheDocument();
+    expect(screen.queryByText(/최근 집계 실패/)).toBeNull();
+  });
+
+  it('집계 시각이 오늘이 아니면 MM-DD HH:MM 로 보여 준다', async () => {
+    vi.mocked(svc.getMeta).mockResolvedValue({
+      hourly_last_ok: '2026-09-26T23:50:00',
+      daily_last_ok: null,
+      last_failed: null,
+      lookups_loaded_at: null,
+    });
+    render(<PageHeader view="week" onViewChange={() => undefined} />);
+    expect(await screen.findByText('09-26 23:50 집계')).toBeInTheDocument();
   });
 });

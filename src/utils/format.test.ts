@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCount, formatGrowth, formatRange, formatRatio, formatTime, formatWindow } from './format';
+import { formatCount, formatGrowth, formatJobTime, formatRange, formatRatio, formatTime, formatWindow } from './format';
 
 describe('format', () => {
   it('formatCount', () => {
@@ -35,5 +35,11 @@ describe('format', () => {
   it('formatTime 은 ISO 에서 HH:MM', () => {
     expect(formatTime('2026-09-27T00:05:12')).toBe('00:05');
     expect(formatTime(null)).toBe('');
+  });
+  it('formatJobTime 은 오늘이면 HH:MM, 아니면 MM-DD HH:MM', () => {
+    const now = new Date('2026-09-27T12:00:00');
+    expect(formatJobTime('2026-09-27T10:05:00', now)).toBe('10:05');
+    expect(formatJobTime('2026-09-26T23:50:00', now)).toBe('09-26 23:50');
+    expect(formatJobTime(null, now)).toBe('');
   });
 });

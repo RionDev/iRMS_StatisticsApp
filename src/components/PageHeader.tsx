@@ -2,7 +2,8 @@ import { useThemeStore } from '@common/stores/themeStore';
 import { useStat } from '../hooks/useStat';
 import { getMeta, getSummary, getTrend } from '../services/statsService';
 import type { View } from '../types/stats';
-import { formatCount, formatRange, formatRatio, formatTime, formatWindow } from '../utils/format';
+import { formatCount, formatJobTime, formatRange, formatRatio, formatWindow } from '../utils/format';
+import { isActiveFailure } from '../utils/meta';
 import { toApiView } from '../utils/view';
 import { KpiCard } from './KpiCard';
 import { ViewSelector } from './ViewSelector';
@@ -41,9 +42,9 @@ export function PageHeader({ view, onViewChange }: PageHeaderProps) {
         {meta.data && (
           <span style={{ marginLeft: 'auto', display: 'flex', gap: '12px', fontSize: theme.fontSize.sm }}>
             {meta.data.hourly_last_ok && (
-              <span style={{ color: theme.colors.textMuted }}>{formatTime(meta.data.hourly_last_ok)} 집계</span>
+              <span style={{ color: theme.colors.textMuted }}>{formatJobTime(meta.data.hourly_last_ok)} 집계</span>
             )}
-            {meta.data.last_failed && (
+            {meta.data.last_failed && isActiveFailure(meta.data) && (
               <span style={{ color: theme.colors.warning }}>
                 최근 집계 실패: {meta.data.last_failed.job} {meta.data.last_failed.finished_at?.replace('T', ' ').slice(0, 16) ?? ''}
               </span>

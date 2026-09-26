@@ -34,3 +34,15 @@ export function formatWindow(w: TrendWindow | null): string {
 export function formatTime(iso: string | null): string {
   return iso ? iso.slice(11, 16) : '';
 }
+
+/** 집계 시각 — 오늘이면 "HH:MM", 아니면(날짜가 다르면) "MM-DD HH:MM" */
+export function formatJobTime(iso: string | null, now: Date = new Date()): string {
+  if (!iso) return '';
+  const time = iso.slice(11, 16);
+  const datePart = iso.slice(0, 10);
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const todayPart = `${y}-${m}-${d}`;
+  return datePart === todayPart ? time : `${datePart.slice(5)} ${time}`;
+}
