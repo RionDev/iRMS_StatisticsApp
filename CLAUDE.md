@@ -1,17 +1,12 @@
 # iRMS Statistics App
 
-통계 앱. 현재는 **샘플 통계 대시보드**(vt_metadata 이식 프로젝트의 StatsPage)를 제공한다.
-데이터는 sample-service(BE)의 `/api/sample/stats/*` 를 조회한다.
+통계 앱. **샘플 통계 대시보드**를 제공한다.
+데이터는 stats_service(BE)의 `/api/stats/sample/*` 를 조회한다.
 
 ## 책임
 
-- `GET /api/sample/stats/summary` KPI (전체/24h/7d/평균 진단율/pool 비율)
-- `GET /api/sample/stats/daily?days=` 일별 등록 추이
-- `GET /api/sample/stats/types` 포맷/카테고리 분포
-- `GET /api/sample/stats/locales` 로케일 분포
-- `GET /api/sample/stats/detection-ratio` 진단율 히스토그램
-- `GET /api/sample/stats/top-detections?vendor_id=&limit=` 벤더별 TOP 진단명
-- `GET /api/sample/meta/filters` (vendors 셀렉트 옵션)
+샘플 통계 대시보드 3페이지(유입 · 파일 타입 · 진단)를 stats_service `/api/stats/sample/*` 로 렌더링한다.
+엔드포인트 목록은 아래 계약 SoT 문서 참조.
 
 ## 공통 규칙
 
@@ -27,11 +22,15 @@
 - 다크모드: 차트 색상은 반드시 `useThemeStore().theme` 토큰 →
   `EChart.tsx` 의 `baseChartOption`/`axisStyle`/`chartPalette` 헬퍼 경유.
   option 은 `useMemo([data, theme])` 로 재생성해 테마 전환에 반응한다
-- **주의**: `/stats/*` 응답 스키마는 BE 계획 문서에 미확정 — `types/stats.ts` 는
-  가정 계약이다. BE 2단계 구현 시 Swagger(`/api/sample/docs`) 로 재검증할 것
 - mock: UI 단독 개발 시에만 `.env`의 `VITE_USE_MOCK=1`로 `services/mock/` 사용
+- 계약 SoT: `iRMS_FE/docs/superpowers/specs/2026-09-26-stats-service-api-design.md` (stats_service `/api/stats/sample/*`, Swagger `/api/stats/docs`).
+  화면 설계: `iRMS_FE/docs/superpowers/specs/2026-09-27-statistics-app-redesign-design.md`
+- 페이지 3개(`/inflow` · `/type` · `/detection`). 보기는 URL `?view=`(today|day|week|month|total|rising)만 쓴다 — store 금지. `useView()` 로 읽고 쓴다
+- `rising` 은 FE 전용 보기다. API 에는 `toApiView()`(rising → week)로 보낸다. 급상승이 없는 카드는 주간 값 + "주간 기준" 배지
+- TOP-N 수평 막대형 통계는 `RankCard` 로 만든다(목록/급상승 모드 내장). 카드 상태 표시는 `StatBody`
+- 카드 데이터는 `useStat(fetcher, deps)` 로 부른다. 공통 apiClient 는 alert 를 띄우지 않는다 — 실패 UI 는 카드가 보여 준다
+- 테스트: 순수 함수·서비스는 node, 컴포넌트는 파일 첫 줄 `// @vitest-environment jsdom` + `EChart` vi.mock
 
-## BE API 대응
+## 샘플 검색 연동
 
-계약 SoT: `iRMS_BE/docs/plan/vt-sample-service.md` (구현 후 Swagger).
 샘플 검색/상세 화면은 sample 앱(`/sample/`) 담당 — 이 앱은 통계 대시보드만 다룬다.
