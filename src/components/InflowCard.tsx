@@ -47,7 +47,7 @@ function TodayBody() {
     [state.data, theme],
   );
   return (
-    <StatBody state={state} height={H} isEmpty={(d) => d.items.length === 0}>
+    <StatBody state={state} height={H} isEmpty={(d) => d.items.every((i) => i.count === 0)}>
       {() => option && <EChart option={option} height={H} />}
     </StatBody>
   );
@@ -61,7 +61,7 @@ function DayBody() {
     [state.data, theme],
   );
   return (
-    <StatBody state={state} height={H} isEmpty={(d) => d.items.length === 0}>
+    <StatBody state={state} height={H} isEmpty={(d) => d.items.every((i) => i.count === 0)}>
       {(d) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <span style={{ fontSize: '22px', fontWeight: 800, color: theme.colors.text }}>
@@ -83,14 +83,17 @@ function RangeBody({ view }: { view: 'week' | 'month' }) {
     [inflow.data, theme],
   );
   const heatOption = useMemo(() => (heat.data ? heatmapOption(theme, heat.data.cells) : null), [heat.data, theme]);
+  const inflowEmpty = inflow.data ? inflow.data.items.every((i) => i.count === 0) : false;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <StatBody state={inflow} height={H} isEmpty={(d) => d.items.length === 0}>
+      <StatBody state={inflow} height={H} isEmpty={(d) => d.items.every((i) => i.count === 0)}>
         {() => inflowOption && <EChart option={inflowOption} height={H} />}
       </StatBody>
-      <StatBody state={heat} height={HEAT_H}>
-        {() => heatOption && <EChart option={heatOption} height={HEAT_H} />}
-      </StatBody>
+      {!inflowEmpty && (
+        <StatBody state={heat} height={HEAT_H}>
+          {() => heatOption && <EChart option={heatOption} height={HEAT_H} />}
+        </StatBody>
+      )}
     </div>
   );
 }
@@ -104,7 +107,7 @@ function TotalBody() {
     return stackedBarOption(theme, months.map((m) => m.date), poolSeries(theme, months));
   }, [state.data, theme]);
   return (
-    <StatBody state={state} height={H} isEmpty={(d) => d.items.length === 0}>
+    <StatBody state={state} height={H} isEmpty={(d) => d.items.every((i) => i.count === 0)}>
       {() => option && <EChart option={option} height={H} />}
     </StatBody>
   );

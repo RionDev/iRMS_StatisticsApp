@@ -62,4 +62,24 @@ describe('InflowCard', () => {
     expect(svc.getInflow).toHaveBeenCalledWith('total');
     expect(svc.getInflowHeatmap).not.toHaveBeenCalled();
   });
+
+  it('today → 24 시간 모두 0건이면 빈 상태', async () => {
+    vi.mocked(svc.getInflowToday).mockResolvedValue({
+      ...env('today'),
+      items: Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 })),
+    } as never);
+    render(<InflowCard view="today" />);
+    expect(await screen.findByText('해당 기간 데이터가 없습니다')).toBeInTheDocument();
+    expect(screen.queryByTestId('echart')).toBeNull();
+  });
+
+  it('week → 유입이 모두 0건이면 빈 상태, 히트맵도 렌더하지 않는다', async () => {
+    vi.mocked(svc.getInflow).mockResolvedValue({
+      ...env('week'),
+      items: [{ date: '2026-09-26', count: 0, black: 0, gray: 0 }],
+    } as never);
+    render(<InflowCard view="week" />);
+    expect(await screen.findByText('해당 기간 데이터가 없습니다')).toBeInTheDocument();
+    expect(screen.queryByTestId('echart')).toBeNull();
+  });
 });
