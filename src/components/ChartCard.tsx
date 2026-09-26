@@ -3,13 +3,15 @@ import { useThemeStore } from '@common/stores/themeStore';
 
 interface ChartCardProps {
   title: string;
+  /** 제목 옆 작은 배지 (예: BasisBadge) */
+  badge?: ReactNode;
   /** 우측 컨트롤 (기간 버튼, 벤더 셀렉트 등) */
   controls?: ReactNode;
   children: ReactNode;
   style?: CSSProperties;
 }
 
-export function ChartCard({ title, controls, children, style }: ChartCardProps) {
+export function ChartCard({ title, badge, controls, children, style }: ChartCardProps) {
   const { theme } = useThemeStore();
   return (
     <div
@@ -35,14 +37,9 @@ export function ChartCard({ title, controls, children, style }: ChartCardProps) 
           marginBottom: '8px',
         }}
       >
-        <span
-          style={{
-            fontSize: theme.fontSize.base,
-            fontWeight: 700,
-            color: theme.colors.text,
-          }}
-        >
-          {title}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <span style={{ fontSize: theme.fontSize.base, fontWeight: 700, color: theme.colors.text }}>{title}</span>
+          {badge}
         </span>
         {controls}
       </div>
@@ -67,5 +64,25 @@ export function ChartState({ height, children }: { height: number; children: Rea
     >
       {children}
     </div>
+  );
+}
+
+/** 제목 옆 작은 배지 — 예: 급상승 없는 카드의 "주간 기준" */
+export function BasisBadge({ children }: { children: ReactNode }) {
+  const { theme } = useThemeStore();
+  return (
+    <span
+      style={{
+        fontSize: theme.fontSize.xs,
+        color: theme.colors.textMuted,
+        backgroundColor: theme.colors.surfaceMuted,
+        borderRadius: theme.radius.sm,
+        padding: '2px 6px',
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+    </span>
   );
 }

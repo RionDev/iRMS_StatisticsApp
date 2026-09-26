@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as echarts from 'echarts/core';
-import { BarChart, LineChart, PieChart } from 'echarts/charts';
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
+import { BarChart, HeatmapChart, LineChart, PieChart } from 'echarts/charts';
+import { GridComponent, LegendComponent, TooltipComponent, VisualMapComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { EChartsCoreOption } from 'echarts/core';
 import type { Theme } from '@common/styles/theme';
@@ -10,19 +10,28 @@ echarts.use([
   LineChart,
   BarChart,
   PieChart,
+  HeatmapChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
+  VisualMapComponent,
   CanvasRenderer,
 ]);
+
+export interface ChartClickParams {
+  name: string;
+  dataIndex: number;
+  data: unknown;
+}
 
 interface EChartProps {
   option: EChartsCoreOption;
   height: number;
+  onClick?: (params: ChartClickParams) => void;
 }
 
 /** ECharts 캔버스 래퍼 — option 교체 시 전체 갱신(notMerge)으로 테마 전환에 대응 */
-export function EChart({ option, height }: EChartProps) {
+export function EChart({ option, height, onClick }: EChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
 
@@ -43,6 +52,16 @@ export function EChart({ option, height }: EChartProps) {
   useEffect(() => {
     chartRef.current?.setOption(option, true);
   }, [option]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !onClick) return undefined;
+    const handler = (params: unknown) => onClick(params as ChartClickParams);
+    chart.on('click', handler);
+    return () => {
+      chart.off('click', handler);
+    };
+  }, [onClick]);
 
   return <div ref={containerRef} style={{ width: '100%', height: `${height}px` }} />;
 }
