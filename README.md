@@ -29,7 +29,7 @@ React 18 + TypeScript, Vite, ECharts, Zustand/Axios (common 제공), Vitest + RT
 ## 연동 BE API
 
 Base `/api/stats/sample/*` (stats_service, 게이트웨이 경유). 계약 SoT:
-`docs/superpowers/specs/2026-09-26-stats-service-api-design.md` → Swagger `/api/stats/docs`.
+`iRMS_FE/docs/superpowers/specs/2026-09-26-stats-service-api-design.md` → Swagger `/api/stats/docs`.
 
 > UI 단독 개발 시에만 `.env`의 `VITE_USE_MOCK=1`로 mock 데이터를 사용한다.
 
