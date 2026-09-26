@@ -12,7 +12,7 @@ const DetectionPage = lazy(() => import('./pages/DetectionPage').then((m) => ({ 
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   if (!isAuthenticated) {
-    window.location.href = '/statistics/login?redirect=' + encodeURIComponent(window.location.pathname);
+    window.location.href = '/statistics/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
     return null;
   }
   return children;
