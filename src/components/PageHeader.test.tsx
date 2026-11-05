@@ -13,7 +13,12 @@ import { PageHeader } from './PageHeader';
 
 const summary = (view: string, registered: number) => ({
   view,
-  range: view === 'total' ? null : { from: '2026-09-20', to: '2026-09-26' },
+  range:
+    view === 'total'
+      ? null
+      : view === 'today'
+        ? { from: '2026-09-27', to: '2026-09-27' }
+        : { from: '2026-09-20', to: '2026-09-26' },
   computed_at: null,
   total_samples: registered,
   registered,
@@ -46,19 +51,19 @@ describe('PageHeader', () => {
     vi.useRealTimers();
   });
 
-  it('주간: 기간 문구, 전체 샘플은 total 값, 집계 시각과 실패 문구', async () => {
+  it('주간: 날짜만(매시 집계 시각 없음), 전체 샘플은 total 값, 실패 문구', async () => {
     render(<PageHeader view="week" onViewChange={() => undefined} />);
     expect(await screen.findByText('2026-09-20 ~ 09-26')).toBeInTheDocument();
     expect(await screen.findByText('9,999')).toBeInTheDocument();
     expect(await screen.findByText('120')).toBeInTheDocument();
-    expect(await screen.findByText('10:05 집계')).toBeInTheDocument();
     expect(await screen.findByText(/최근 집계 실패: daily/)).toBeInTheDocument();
+    expect(screen.queryByText('10:05 집계')).toBeNull();
     expect(svc.getTrend).not.toHaveBeenCalled();
   });
 
   it('급상승: week 로 KPI 를 부르고 창 문구를 보여 준다', async () => {
     render(<PageHeader view="rising" onViewChange={() => undefined} />);
-    expect(await screen.findByText('이번 주 09-20~09-26 · 전주 09-13~09-19')).toBeInTheDocument();
+    expect(await screen.findByText('전주 09-13~09-19 · 이번 주 09-20~09-26')).toBeInTheDocument();
     await waitFor(() => expect(svc.getSummary).toHaveBeenCalledWith('week'));
     expect(svc.getTrend).toHaveBeenCalledWith('source', { limit: 1 });
   });
@@ -77,19 +82,20 @@ describe('PageHeader', () => {
       last_failed: { job: 'hourly', finished_at: '2026-09-27T09:00:00', message: 'x' },
       lookups_loaded_at: null,
     });
-    render(<PageHeader view="week" onViewChange={() => undefined} />);
-    expect(await screen.findByText('10:05 집계')).toBeInTheDocument();
+    render(<PageHeader view="today" onViewChange={() => undefined} />);
+    expect(await screen.findByText('2026-09-27 00:00 ~ 10:05')).toBeInTheDocument();
     expect(screen.queryByText(/최근 집계 실패/)).toBeNull();
   });
 
-  it('집계 시각이 오늘이 아니면 MM-DD HH:MM 로 보여 준다', async () => {
+  it('오늘: 마지막 매시 집계가 오늘이 아니면 날짜와 MM-DD HH:MM 집계를 따로 보여 준다', async () => {
     vi.mocked(svc.getMeta).mockResolvedValue({
       hourly_last_ok: '2026-09-26T23:50:00',
       daily_last_ok: null,
       last_failed: null,
       lookups_loaded_at: null,
     });
-    render(<PageHeader view="week" onViewChange={() => undefined} />);
+    render(<PageHeader view="today" onViewChange={() => undefined} />);
+    expect(await screen.findByText('오늘 (2026-09-27)')).toBeInTheDocument();
     expect(await screen.findByText('09-26 23:50 집계')).toBeInTheDocument();
   });
 });

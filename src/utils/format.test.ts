@@ -17,7 +17,11 @@ describe('format', () => {
   });
   it('formatRange', () => {
     expect(formatRange('total', null)).toBe('전체 기간');
+    // 오늘은 매시 집계 — 같은 날 마지막 매시 집계 시각까지 시간으로 보인다
+    expect(formatRange('today', { from: '2026-09-27', to: '2026-09-27' }, '2026-09-27T10:05:00')).toBe('2026-09-27 00:00 ~ 10:05');
+    // 매시 집계가 없거나 다른 날이면 날짜만
     expect(formatRange('today', { from: '2026-09-27', to: '2026-09-27' })).toBe('오늘 (2026-09-27)');
+    expect(formatRange('today', { from: '2026-09-27', to: '2026-09-27' }, '2026-09-26T23:50:00')).toBe('오늘 (2026-09-27)');
     expect(formatRange('day', { from: '2026-09-26', to: '2026-09-26' })).toBe('2026-09-26');
     expect(formatRange('week', { from: '2026-09-20', to: '2026-09-26' })).toBe('2026-09-20 ~ 09-26');
     expect(formatRange('rising', { from: '2026-09-20', to: '2026-09-26' })).toBe('2026-09-20 ~ 09-26');
@@ -30,7 +34,7 @@ describe('format', () => {
         cur: { from: '2026-09-20', to: '2026-09-26' },
         prev: { from: '2026-09-13', to: '2026-09-19' },
       }),
-    ).toBe('이번 주 09-20~09-26 · 전주 09-13~09-19');
+    ).toBe('전주 09-13~09-19 · 이번 주 09-20~09-26');
   });
   it('formatTime 은 ISO 에서 HH:MM', () => {
     expect(formatTime('2026-09-27T00:05:12')).toBe('00:05');

@@ -16,18 +16,30 @@ export function formatGrowth(g: number | null): string {
   return `${rounded >= 0 ? '+' : ''}${rounded.toLocaleString('ko-KR')}%`;
 }
 
-export function formatRange(view: View, range: DateRange | null): string {
+/**
+ * 기간 문구. 오늘은 매시 집계라 같은 날 마지막 매시 집계(hourlyLastOk)가 있으면
+ * "YYYY-MM-DD 00:00 ~ HH:MM" 으로 시간까지, 나머지(일일 집계)는 날짜만 보인다.
+ */
+export function formatRange(view: View, range: DateRange | null, hourlyLastOk?: string | null): string {
   if (view === 'total') return '전체 기간';
   if (!range) return '';
-  if (view === 'today') return `오늘 (${range.from})`;
+  if (view === 'today') {
+    return isTodayHourly(range, hourlyLastOk) ? `${range.from} 00:00 ~ ${hourlyLastOk.slice(11, 16)}` : `오늘 (${range.from})`;
+  }
   if (range.from === range.to) return range.from;
   return `${range.from} ~ ${range.to.slice(5)}`;
+}
+
+/** 오늘 범위와 같은 날의 매시 집계 시각이 있는지 */
+export function isTodayHourly(range: DateRange, hourlyLastOk?: string | null): hourlyLastOk is string {
+  return !!hourlyLastOk && hourlyLastOk.slice(0, 10) === range.from;
 }
 
 export function formatWindow(w: TrendWindow | null): string {
   if (!w) return '급상승 집계 전';
   const md = (d: string) => d.slice(5);
-  return `이번 주 ${md(w.cur.from)}~${md(w.cur.to)} · 전주 ${md(w.prev.from)}~${md(w.prev.to)}`;
+  // 이른 기간 → 늦은 기간 순 (전주 → 이번 주). 다른 범위 표기(from ~ to)와 같은 방향이다.
+  return `전주 ${md(w.prev.from)}~${md(w.prev.to)} · 이번 주 ${md(w.cur.from)}~${md(w.cur.to)}`;
 }
 
 /** "2026-09-27T00:05:12" → "00:05" */

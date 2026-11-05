@@ -2,7 +2,7 @@ import { useThemeStore } from '@common/stores/themeStore';
 import { useStat } from '../hooks/useStat';
 import { getMeta, getSummary, getTrend } from '../services/statsService';
 import type { View } from '../types/stats';
-import { formatCount, formatJobTime, formatRange, formatRatio, formatWindow } from '../utils/format';
+import { formatCount, formatJobTime, formatRange, formatRatio, formatWindow, isTodayHourly } from '../utils/format';
 import { isActiveFailure } from '../utils/meta';
 import { toApiView } from '../utils/view';
 import { KpiCard } from './KpiCard';
@@ -13,7 +13,7 @@ interface PageHeaderProps {
   onViewChange: (v: View) => void;
 }
 
-/** 보기 선택 + 기간 문구 + 집계 시각 + KPI 줄 — 세 페이지 공통 */
+/** 보기 선택 + 기간 문구(오늘은 매시 집계 시각까지) + 집계 실패 + KPI 줄 — 세 페이지 공통 */
 export function PageHeader({ view, onViewChange }: PageHeaderProps) {
   const { theme } = useThemeStore();
   const apiView = toApiView(view);
@@ -29,9 +29,15 @@ export function PageHeader({ view, onViewChange }: PageHeaderProps) {
       ? formatWindow(trendWindow.data.window)
       : ''
     : period.data
-      ? formatRange(view, period.data.range)
+      ? formatRange(view, period.data.range, meta.data?.hourly_last_ok)
       : '';
   const p = period.data;
+  // 매시 집계 시각은 오늘 보기에만 의미가 있다(나머지는 일일 집계라 날짜만). 같은 날이면 기간 문구에
+  // 이미 들어가므로, 오늘인데 마지막 매시 집계가 다른 날일 때만 따로 보여 준다.
+  const hourlyLabel =
+    view === 'today' && meta.data?.hourly_last_ok && !(p?.range && isTodayHourly(p.range, meta.data.hourly_last_ok))
+      ? `${formatJobTime(meta.data.hourly_last_ok)} 집계`
+      : null;
   const basis = rising ? '주간 기준' : undefined;
 
   return (
@@ -41,9 +47,7 @@ export function PageHeader({ view, onViewChange }: PageHeaderProps) {
         <span style={{ fontSize: theme.fontSize.base, color: theme.colors.text, fontWeight: 600 }}>{periodText}</span>
         {meta.data && (
           <span style={{ marginLeft: 'auto', display: 'flex', gap: '12px', fontSize: theme.fontSize.sm }}>
-            {meta.data.hourly_last_ok && (
-              <span style={{ color: theme.colors.textMuted }}>{formatJobTime(meta.data.hourly_last_ok)} 집계</span>
-            )}
+            {hourlyLabel && <span style={{ color: theme.colors.textMuted }}>{hourlyLabel}</span>}
             {meta.data.last_failed && isActiveFailure(meta.data) && (
               <span style={{ color: theme.colors.warning }}>
                 최근 집계 실패: {meta.data.last_failed.job} {meta.data.last_failed.finished_at?.replace('T', ' ').slice(0, 16) ?? ''}
