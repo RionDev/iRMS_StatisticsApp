@@ -13,6 +13,7 @@
 - 레이어: `pages / components / services / types` — API 호출은 `services/`에서만
 - `@common` alias 사용. 공통 모듈 규칙은 `common/CLAUDE.md`
 - 인증: 공통 `LoginPage`/`useAuthStore`/`useAppAccess("/statistics")`
+- 기능 권한: `StatsLayout` 이 `useFeatures("/statistics").can("view")` 를 확인한 뒤에만 통계 화면·API 를 연다 (키는 BE stats_service `src/features.py`). 실제 차단은 BE
 
 ## 고유 규칙
 
